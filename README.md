@@ -7,13 +7,13 @@ serves.
 ## Install
 
 ```bash
-pi install git:git@github.com:2bb-dev/pi-openorange-provider@v0.1.0
+pi install git:github.com/2bb-dev/pi-openorange-provider
 ```
 
 Try it without installing:
 
 ```bash
-pi -e git:git@github.com:2bb-dev/pi-openorange-provider
+pi -e git:github.com/2bb-dev/pi-openorange-provider
 ```
 
 ## Sign in
@@ -60,8 +60,11 @@ that user.
 
 ## Development
 
+`.npmrc` sets `omit=dev` so installing this package into Pi does not pull the
+test toolchain. Ask for dev dependencies explicitly:
+
 ```bash
-npm install
+npm install --include=dev
 npm test
 npm run typecheck
 ```
