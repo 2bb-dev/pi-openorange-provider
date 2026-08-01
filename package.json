@@ -1,0 +1,30 @@
+{
+  "name": "@2bb/pi-openorange-provider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pi model provider for OpenOrange instances (LiteLLM inference endpoint)",
+  "keywords": ["pi-package"],
+  "license": "UNLICENSED",
+  "pi": {
+    "extensions": ["./extensions/openorange.ts"]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.83.0",
+    "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
