@@ -11,7 +11,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import { stream, streamSimple } from "@earendil-works/pi-ai/compat";
 
-import { withAttribution } from "./attribution.js";
+import { withOpenOrangePayload } from "./payload.js";
 import {
 	API_KEY_ENV,
 	BASE_URL_ENV,
@@ -127,9 +127,9 @@ export function createOpenOrangeProvider(): Provider<Api> {
 		},
 
 		stream: (model, context, options) =>
-			stream(model, context, withAttribution(model, options) as ProviderStreamOptions | undefined),
+			stream(model, context, withOpenOrangePayload(model, options) as ProviderStreamOptions | undefined),
 		streamSimple: (model, context, options) =>
-			streamSimple(model, context, withAttribution(model, options)),
+			streamSimple(model, context, withOpenOrangePayload(model, options)),
 	};
 }
 
