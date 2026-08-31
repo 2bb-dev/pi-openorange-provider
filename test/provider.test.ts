@@ -1,10 +1,14 @@
-import type {
-	ApiKeyCredential,
-	AuthContext,
-	AuthInteraction,
-	AuthPrompt,
-	ProviderModelsStore,
+import {
+	InMemoryCredentialStore,
+	InMemoryModelsStore,
+	type ApiKeyCredential,
+	type AuthContext,
+	type AuthPrompt,
+	type ModelsStoreEntry,
+	type ProviderAuthInteraction,
+	type RefreshModelsContext,
 } from "@earendil-works/pi-ai";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createOpenOrangeProvider } from "../src/provider.js";
@@ -34,9 +38,10 @@ function stubInstance(overrides: Record<string, unknown> = {}) {
 	return fetchMock;
 }
 
-function interaction(answers: string[]): AuthInteraction {
+function interaction(answers: string[]): ProviderAuthInteraction {
 	const queue = [...answers];
 	return {
+		signal: new AbortController().signal,
 		prompt: async (_prompt: AuthPrompt) => {
 			const next = queue.shift();
 			if (next === undefined) throw new Error("unexpected prompt");
@@ -53,14 +58,29 @@ function authContext(env: Record<string, string> = {}): AuthContext {
 	};
 }
 
-function memoryStore(): ProviderModelsStore {
-	let value: Awaited<ReturnType<ProviderModelsStore["read"]>>;
+function operationSignal(): AbortSignal {
+	return new AbortController().signal;
+}
+
+function memoryStore() {
+	let value: ModelsStoreEntry | undefined;
 	return {
-		read: async () => value,
-		write: async (next) => {
-			value = next;
+		context(credential: ApiKeyCredential | undefined, allowNetwork: boolean): RefreshModelsContext {
+			return {
+				credential,
+				stored: value,
+				publish: async ({ persist, update }) => {
+					if (persist === null) value = undefined;
+					else if (persist !== undefined) value = persist;
+					update?.();
+					return true;
+				},
+				allowNetwork,
+				signal: operationSignal(),
+			};
 		},
-	} as ProviderModelsStore;
+		read: () => value,
+	};
 }
 
 afterEach(() => {
@@ -122,6 +142,24 @@ describe("login", () => {
 			env: { OPENORANGE_BASE_URL: INSTANCE },
 		});
 	});
+
+	it("synchronizes Pi model state after login", async () => {
+		stubInstance();
+		const runtime = await ModelRuntime.create({
+			credentials: new InMemoryCredentialStore(),
+			modelsStore: new InMemoryModelsStore(),
+			modelsPath: null,
+			refreshOnCreate: false,
+		});
+		runtime.registerNativeProvider(createOpenOrangeProvider());
+
+		await expect(
+			runtime.login("openorange", "api_key", interaction(["acme.openorange.ai", "sk-test"])),
+		).resolves.toMatchObject({ type: "api_key", key: "sk-test" });
+		expect(runtime.getAvailableSnapshot().filter((model) => model.provider === "openorange")).toHaveLength(
+			2,
+		);
+	});
 });
 
 describe("resolve", () => {
@@ -133,7 +171,9 @@ describe("resolve", () => {
 
 	it("uses the stored credential", async () => {
 		const provider = createOpenOrangeProvider();
-		await expect(provider.auth.apiKey?.resolve({ ctx: authContext(), credential })).resolves.toEqual({
+		await expect(
+			provider.auth.apiKey?.resolve({ ctx: authContext(), credential, signal: operationSignal() }),
+		).resolves.toEqual({
 			auth: { apiKey: "sk-test" },
 			env: { OPENORANGE_BASE_URL: INSTANCE, OPENORANGE_USER_ID: "sasha" },
 			source: `stored credential (acme.openorange.ai)`,
@@ -146,7 +186,9 @@ describe("resolve", () => {
 			OPENORANGE_BASE_URL: "acme.openorange.ai",
 			OPENORANGE_API_KEY: "sk-env",
 		});
-		await expect(provider.auth.apiKey?.resolve({ ctx, credential: undefined })).resolves.toEqual({
+		await expect(
+			provider.auth.apiKey?.resolve({ ctx, credential: undefined, signal: operationSignal() }),
+		).resolves.toEqual({
 			auth: { apiKey: "sk-env" },
 			env: { OPENORANGE_BASE_URL: INSTANCE },
 			source: "OPENORANGE_BASE_URL (acme.openorange.ai)",
@@ -157,7 +199,7 @@ describe("resolve", () => {
 		const provider = createOpenOrangeProvider();
 		const ctx = authContext({ OPENORANGE_BASE_URL: INSTANCE });
 		await expect(
-			provider.auth.apiKey?.resolve({ ctx, credential: undefined }),
+			provider.auth.apiKey?.resolve({ ctx, credential: undefined, signal: operationSignal() }),
 		).resolves.toBeUndefined();
 	});
 
@@ -167,6 +209,7 @@ describe("resolve", () => {
 			provider.auth.apiKey?.resolve({
 				ctx: authContext(),
 				credential: { type: "api_key", key: "sk-test", env: { OPENORANGE_BASE_URL: "localhost" } },
+				signal: operationSignal(),
 			}),
 		).resolves.toBeUndefined();
 	});
@@ -183,19 +226,27 @@ describe("refreshModels", () => {
 		stubInstance();
 		const provider = createOpenOrangeProvider();
 		const store = memoryStore();
-		await provider.refreshModels?.({ credential, store, allowNetwork: true });
+		await provider.refreshModels?.(store.context(credential, true));
 		expect(provider.getModels()).toHaveLength(2);
-		expect((await store.read())?.models).toHaveLength(2);
+		expect(store.read()?.models).toHaveLength(2);
 	});
 
 	it("serves the cached catalog offline", async () => {
 		stubInstance();
-		const store = memoryStore();
 		const first = createOpenOrangeProvider();
-		await first.refreshModels?.({ credential, store, allowNetwork: true });
+		await first.auth.apiKey?.login?.(interaction(["acme.openorange.ai", "sk-test"]));
 
 		const offline = createOpenOrangeProvider();
-		await offline.refreshModels?.({ credential, store, allowNetwork: false });
+		await offline.refreshModels?.({
+			credential,
+			stored: { models: first.getModels(), checkedAt: Date.now() },
+			publish: async ({ update }) => {
+				update?.();
+				return true;
+			},
+			allowNetwork: false,
+			signal: operationSignal(),
+		});
 		expect(offline.getModels()).toHaveLength(2);
 	});
 
@@ -203,21 +254,22 @@ describe("refreshModels", () => {
 		stubInstance();
 		const store = memoryStore();
 		const first = createOpenOrangeProvider();
-		await first.refreshModels?.({ credential, store, allowNetwork: true });
+		await first.refreshModels?.(store.context(credential, true));
 
 		const other = createOpenOrangeProvider();
-		await other.refreshModels?.({
-			credential: { ...credential, env: { OPENORANGE_BASE_URL: "https://other.openorange.ai" } },
-			store,
-			allowNetwork: false,
-		});
+		await other.refreshModels?.(
+			store.context(
+				{ ...credential, env: { OPENORANGE_BASE_URL: "https://other.openorange.ai" } },
+				false,
+			),
+		);
 		expect(other.getModels()).toEqual([]);
 	});
 
 	it("does nothing without configuration", async () => {
 		const fetchMock = stubInstance();
 		const provider = createOpenOrangeProvider();
-		await provider.refreshModels?.({ credential: undefined, store: memoryStore(), allowNetwork: true });
+		await provider.refreshModels?.(memoryStore().context(undefined, true));
 		expect(fetchMock).not.toHaveBeenCalled();
 		expect(provider.getModels()).toEqual([]);
 	});

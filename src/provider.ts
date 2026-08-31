@@ -106,14 +106,19 @@ export function createOpenOrangeProvider(): Provider<Api> {
 
 		async refreshModels(context: RefreshModelsContext): Promise<void> {
 			const instanceUrl = credentialInstanceUrl(context.credential) ?? envInstanceUrl();
-			const stored = await context.store.read();
-			if (stored) {
+			if (context.stored) {
 				// Drop a catalog cached for a different instance.
-				models = stored.models.filter(
+				const restored = context.stored.models.filter(
 					(model) => model.provider === PROVIDER_ID && belongsTo(model, instanceUrl),
 				);
+				const published = await context.publish({
+					update: () => {
+						models = restored;
+					},
+				});
+				if (!published) return;
 			}
-			if (!context.allowNetwork || context.signal?.aborted) return;
+			if (!context.allowNetwork || context.signal.aborted) return;
 			if (!instanceUrl) return;
 
 			const apiKey =
@@ -122,8 +127,14 @@ export function createOpenOrangeProvider(): Provider<Api> {
 			if (!apiKey) return;
 
 			const deployments = await fetchDeployments(instanceUrl, apiKey, context.signal);
-			models = toModels(deployments, instanceUrl);
-			if (!context.signal?.aborted) await context.store.write({ models, checkedAt: Date.now() });
+			if (context.signal.aborted) return;
+			const refreshed = toModels(deployments, instanceUrl);
+			await context.publish({
+				persist: { models: refreshed, checkedAt: Date.now() },
+				update: () => {
+					models = refreshed;
+				},
+			});
 		},
 
 		stream: (model, context, options) =>

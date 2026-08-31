@@ -35,8 +35,13 @@ describe.skipIf(!live)("live instance", () => {
 	beforeAll(async () => {
 		await provider.refreshModels?.({
 			credential,
-			store: { read: async () => undefined, write: async () => undefined } as never,
+			stored: undefined,
+			publish: async ({ update }) => {
+				update?.();
+				return true;
+			},
 			allowNetwork: true,
+			signal: new AbortController().signal,
 		});
 		const wanted = process.env["OPENORANGE_LIVE_MODEL"];
 		const candidates = provider.getModels();
