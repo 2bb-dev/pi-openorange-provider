@@ -35,6 +35,52 @@ const DEPLOYMENTS = [
 	{ model_name: "groq/whisper-large-v3-turbo", model_info: { mode: "audio_transcription" } },
 ];
 
+/** Deployments as an instance renders them behind its upstream proxy: no
+ * LiteLLM `supports_*` flags, Pi metadata instead. */
+const PROXIED = [
+	{
+		model_name: "anthropic/claude-haiku-4-5",
+		litellm_params: { model: "litellm_proxy/anthropic/claude-haiku-4-5" },
+		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
+	},
+	{
+		model_name: "anthropic/claude-opus-5",
+		litellm_params: { model: "litellm_proxy/anthropic/claude-opus-5" },
+		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
+	},
+	{
+		model_name: "anthropic/claude-fable-5",
+		litellm_params: { model: "litellm_proxy/anthropic/claude-fable-5" },
+		model_info: {
+			mode: "chat",
+			pi_api: "anthropic-messages",
+			pi_reasoning: true,
+			pi_compat: { forceAdaptiveThinking: false, ignored: 1 },
+			pi_thinking_level_map: { off: null, xhigh: "xhigh", bogus: "x", low: "" },
+		},
+	},
+	{
+		model_name: "openai/gpt-5.6-luna",
+		litellm_params: { model: "litellm_proxy/openai/gpt-5.6-luna" },
+		model_info: {
+			mode: "responses",
+			pi_api: "openai-responses",
+			pi_reasoning: true,
+			pi_thinking_level_map: { xhigh: "xhigh", max: "max" },
+		},
+	},
+	{
+		model_name: "deepseek/deepseek-v4-pro",
+		litellm_params: { model: "litellm_proxy/deepseek/deepseek-v4-pro" },
+		model_info: { mode: "chat", supports_reasoning: true, supports_vision: false },
+	},
+	{
+		model_name: "custom/fast",
+		litellm_params: { model: "openai/fast" },
+		model_info: { mode: "chat", pi_api: "openai-completions", pi_reasoning: false },
+	},
+];
+
 describe("toModels", () => {
 	const models = toModels(DEPLOYMENTS, INSTANCE);
 
@@ -42,10 +88,10 @@ describe("toModels", () => {
 		expect(models.map((model) => model.id)).toEqual(["anthropic/claude-sonnet-5", "openai/gpt-5.5"]);
 	});
 
-	it("routes anthropic aliases to /v1/messages and the rest to /v1/chat/completions", () => {
+	it("routes anthropic aliases to /v1/messages and responses deployments to /v1/responses", () => {
 		const [claude, gpt] = models;
 		expect(claude).toMatchObject({ api: "anthropic-messages", baseUrl: INSTANCE });
-		expect(gpt).toMatchObject({ api: "openai-completions", baseUrl: `${INSTANCE}/v1` });
+		expect(gpt).toMatchObject({ api: "openai-responses", baseUrl: `${INSTANCE}/v1` });
 	});
 
 	it("converts per-token prices to per-million", () => {
@@ -64,15 +110,66 @@ describe("toModels", () => {
 	it("falls back to safe defaults when the instance omits metadata", () => {
 		expect(models[1]).toMatchObject({
 			reasoning: true,
-			input: ["text"],
+			input: ["text", "image"],
 			contextWindow: 1_050_000,
 			maxTokens: 16_384,
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		});
 	});
 
+	it("only drops image input when the instance denies vision", () => {
+		const proxied = toModels(PROXIED, INSTANCE);
+		expect(proxied.find((m) => m.id === "deepseek/deepseek-v4-pro")?.input).toEqual(["text"]);
+		expect(proxied.find((m) => m.id === "anthropic/claude-haiku-4-5")?.input).toEqual(["text", "image"]);
+	});
+
 	it("ignores deployments without a model name", () => {
 		expect(toModels([{ model_info: { mode: "chat" } }], INSTANCE)).toEqual([]);
+	});
+});
+
+describe("toModels with Pi metadata", () => {
+	const models = toModels(PROXIED, INSTANCE);
+	const byId = (id: string) => models.find((model) => model.id === id);
+
+	it("honours the declared Pi API and reasoning flag", () => {
+		expect(byId("openai/gpt-5.6-luna")).toMatchObject({
+			api: "openai-responses",
+			baseUrl: `${INSTANCE}/v1`,
+			reasoning: true,
+			thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+		});
+		expect(byId("anthropic/claude-haiku-4-5")).toMatchObject({
+			api: "anthropic-messages",
+			baseUrl: INSTANCE,
+			reasoning: true,
+		});
+		expect(byId("anthropic/claude-haiku-4-5")).not.toHaveProperty("compat");
+		expect(byId("custom/fast")).toMatchObject({
+			api: "openai-completions",
+			reasoning: false,
+			compat: { supportsReasoningEffort: false, supportsUsageInStreaming: true },
+		});
+	});
+
+	it("forces adaptive thinking on Claude models that reject budget thinking", () => {
+		expect(byId("anthropic/claude-opus-5")?.compat).toEqual({ forceAdaptiveThinking: true });
+	});
+
+	it("lets pi_compat override the adaptive fallback and keeps only scalar entries", () => {
+		expect(byId("anthropic/claude-fable-5")?.compat).toEqual({ forceAdaptiveThinking: false });
+	});
+
+	it("keeps only valid thinking level entries", () => {
+		expect(byId("anthropic/claude-fable-5")?.thinkingLevelMap).toEqual({ off: null, xhigh: "xhigh" });
+	});
+
+	it("falls back to LiteLLM capability flags without Pi metadata", () => {
+		expect(byId("deepseek/deepseek-v4-pro")).toMatchObject({
+			api: "openai-completions",
+			reasoning: true,
+			compat: { supportsReasoningEffort: true, supportsUsageInStreaming: true },
+		});
 	});
 });
 

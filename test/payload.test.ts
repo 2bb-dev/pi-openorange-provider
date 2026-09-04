@@ -32,6 +32,7 @@ async function payloadFor(api: Api, overrides: StreamOptions = {}, input: unknow
 describe("spend attribution", () => {
 	it("adds the key owner as `user` on OpenAI payloads", async () => {
 		await expect(payloadFor("openai-completions")).resolves.toMatchObject({ user: "sasha" });
+		await expect(payloadFor("openai-responses")).resolves.toMatchObject({ user: "sasha" });
 	});
 
 	it("adds the key owner as `metadata.user_id` on Anthropic payloads", async () => {

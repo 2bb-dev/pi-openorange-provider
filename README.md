@@ -48,10 +48,21 @@ allowed to use, with the instance's own context windows, pricing, and
 capabilities. Non-chat deployments (embeddings, speech) and per-subscription
 slot aliases (`openai/gpt-5.5/2`) are hidden.
 
-**Routing.** `anthropic/*` models are called on the instance's Anthropic
-surface (`POST /v1/messages`) so native prompt caching and thinking work;
-every other model uses the OpenAI-compatible surface
-(`POST /v1/chat/completions`).
+**Routing.** Each deployment declares its Pi protocol in `model_info.pi_api`
+(the same contract OpenOrange Code uses): `openai-responses` models go to
+`POST /v1/responses` so reasoning summaries and encrypted reasoning replay work,
+`anthropic/*` models go to the instance's Anthropic surface
+(`POST /v1/messages`) for native prompt caching and thinking, and everything
+else uses `POST /v1/chat/completions`. Without `pi_api`, `mode: responses`
+selects the Responses surface and Claude aliases the Anthropic one.
+
+**Capabilities.** Deployments proxied through the OpenOrange upstream carry no
+LiteLLM `supports_*` flags, so thinking and vision come from the instance's Pi
+metadata: `pi_reasoning`, `pi_thinking_level_map`, and `pi_compat` (for
+example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5
+need and is applied by default for them). Image input is enabled unless the
+instance sets `supports_vision: false`; Pi drops images for text-only models
+before the request is sent.
 
 **Spend attribution.** Requests carry the LiteLLM user the inference key belongs
 to (`user` for OpenAI, `metadata.user_id` for Anthropic), read from
@@ -94,6 +105,6 @@ OPENORANGE_BASE_URL=https://acme.openorange.ai OPENORANGE_API_KEY=sk-... \
 | --- | --- |
 | `extensions/openorange.ts` | Pi entry point; registers the provider |
 | `src/provider.ts` | Provider: login, auth resolution, model refresh, streaming |
-| `src/litellm.ts` | LiteLLM client and catalog mapping |
+| `src/litellm.ts` | LiteLLM client and catalog → Pi model mapping (`pi_*` metadata) |
 | `src/payload.ts` | Cache-affinity and spend-attribution payload fields |
 | `src/config.ts` | Instance URL rules and endpoint layout |

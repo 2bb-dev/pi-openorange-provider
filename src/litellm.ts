@@ -1,4 +1,4 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { Api, Model, ThinkingLevelMap } from "@earendil-works/pi-ai";
 
 import { PROVIDER_ID, anthropicBaseUrl, openAiBaseUrl } from "./config.js";
 
@@ -90,6 +90,29 @@ const NON_CHAT_MODES = new Set([
 /** OpenOrange renders per-subscription-slot aliases such as `openai/gpt-5.5/2`. */
 const SLOT_ALIAS = /\/\d+$/;
 
+/**
+ * Pi request protocols an OpenOrange deployment may declare in `model_info.pi_api`.
+ * Same contract OpenOrange Code reads (services/operator-api/src/code/modelApi.ts).
+ */
+const PI_APIS = new Set(["openai-responses", "openai-completions", "anthropic-messages"]);
+
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+/**
+ * Claude models that only accept `thinking.type: "adaptive"`; `enabled` is a 400.
+ * Fallback for deployments whose `pi_compat` does not say so, aligned with Pi's
+ * bundled Anthropic catalog and OpenOrange Code.
+ */
+const ADAPTIVE_THINKING_CLAUDE = [
+	"claude-fable-5",
+	"claude-opus-4-6",
+	"claude-opus-4-7",
+	"claude-opus-4-8",
+	"claude-opus-5",
+	"claude-sonnet-4-6",
+	"claude-sonnet-5",
+];
+
 export function toModels(deployments: LitellmDeployment[], instanceUrl: string): Model<Api>[] {
 	const models: Model<Api>[] = [];
 	const seen = new Set<string>();
@@ -108,24 +131,43 @@ export function toModels(deployments: LitellmDeployment[], instanceUrl: string):
 	return models.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/**
+ * Deployments behind the instance's upstream proxy (`litellm_proxy/...`) carry no
+ * LiteLLM capability flags, so the instance declares Pi metadata instead:
+ * `pi_api`, `pi_reasoning`, `pi_thinking_level_map`, `pi_compat`. LiteLLM's own
+ * `supports_*` flags are the fallback for directly-configured deployments.
+ */
 function toModel(
 	id: string,
 	info: Record<string, unknown>,
 	upstream: string | undefined,
 	instanceUrl: string,
 ): Model<Api> {
-	const anthropic = isAnthropic(id, upstream);
+	const api = resolveApi(id, info, upstream);
 	const contextWindow = numberOrUndefined(info["max_input_tokens"]) ?? 128_000;
-	const reasoning = booleanOrUndefined(info["supports_reasoning"]) ?? false;
+	const reasoning =
+		booleanOrUndefined(info["pi_reasoning"]) ?? booleanOrUndefined(info["supports_reasoning"]) ?? false;
+	const thinkingLevelMap = toThinkingLevelMap(info["pi_thinking_level_map"]);
+	const compat = toCompat(info["pi_compat"]);
+	if (api === "anthropic-messages" && compat["forceAdaptiveThinking"] === undefined && isAdaptiveClaude(id, upstream)) {
+		compat["forceAdaptiveThinking"] = true;
+	}
+	if (api === "openai-completions") {
+		compat["supportsReasoningEffort"] ??= reasoning;
+		compat["supportsUsageInStreaming"] ??= true;
+	}
 
 	const model: Model<Api> = {
 		id,
 		name: id,
-		api: anthropic ? "anthropic-messages" : "openai-completions",
+		api,
 		provider: PROVIDER_ID,
-		baseUrl: anthropic ? anthropicBaseUrl(instanceUrl) : openAiBaseUrl(instanceUrl),
+		baseUrl: api === "anthropic-messages" ? anthropicBaseUrl(instanceUrl) : openAiBaseUrl(instanceUrl),
 		reasoning,
-		input: (booleanOrUndefined(info["supports_vision"]) ?? false) ? ["text", "image"] : ["text"],
+		...(reasoning && thinkingLevelMap ? { thinkingLevelMap } : {}),
+		// Vision is assumed unless the instance denies it: proxied Claude/GPT
+		// deployments omit `supports_vision`, and Pi silently drops images otherwise.
+		input: booleanOrUndefined(info["supports_vision"]) === false ? ["text"] : ["text", "image"],
 		cost: {
 			input: perMillion(info["input_cost_per_token"]),
 			output: perMillion(info["output_cost_per_token"]),
@@ -134,19 +176,53 @@ function toModel(
 		},
 		contextWindow,
 		maxTokens: numberOrUndefined(info["max_output_tokens"]) ?? Math.min(contextWindow, 16_384),
+		...(Object.keys(compat).length > 0 ? { compat: compat as Model<Api>["compat"] } : {}),
 	};
-
-	if (!anthropic) {
-		(model as Model<"openai-completions">).compat = {
-			supportsReasoningEffort: reasoning,
-			supportsUsageInStreaming: true,
-		};
-	}
 	return model;
 }
 
+function resolveApi(id: string, info: Record<string, unknown>, upstream: string | undefined): Api {
+	const declared = stringOrUndefined(info["pi_api"]);
+	if (declared && PI_APIS.has(declared)) return declared;
+	if (stringOrUndefined(info["mode"])?.toLowerCase() === "responses") return "openai-responses";
+	return isAnthropic(id, upstream) ? "anthropic-messages" : "openai-completions";
+}
+
 function isAnthropic(modelName: string, upstream: string | undefined): boolean {
-	return modelName.startsWith("anthropic/") || (upstream?.startsWith("anthropic/") ?? false);
+	return [modelName, upstream ?? ""].some(
+		(value) => value.split("/").includes("anthropic") || /(^|[./:_-])claude([./:_-]|$)/.test(value),
+	);
+}
+
+function isAdaptiveClaude(modelName: string, upstream: string | undefined): boolean {
+	return [modelName, upstream ?? ""].some((value) => {
+		const normalized = value.toLowerCase().replaceAll(".", "-");
+		return ADAPTIVE_THINKING_CLAUDE.some((model) => normalized.includes(model));
+	});
+}
+
+function toThinkingLevelMap(value: unknown): ThinkingLevelMap | undefined {
+	if (!isRecord(value)) return undefined;
+	const map: ThinkingLevelMap = {};
+	for (const level of THINKING_LEVELS) {
+		const mapped = value[level];
+		if (mapped === null) map[level] = null;
+		else if (typeof mapped === "string" && mapped.trim()) map[level] = mapped.trim();
+	}
+	return Object.keys(map).length > 0 ? map : undefined;
+}
+
+function toCompat(value: unknown): Record<string, boolean | string> {
+	const compat: Record<string, boolean | string> = {};
+	if (!isRecord(value)) return compat;
+	for (const [key, entry] of Object.entries(value)) {
+		if (typeof entry === "boolean" || typeof entry === "string") compat[key] = entry;
+	}
+	return compat;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function upstreamModel(deployment: LitellmDeployment): string | undefined {

@@ -47,7 +47,7 @@ describe.skipIf(!live)("live instance", () => {
 		const candidates = provider.getModels();
 		const selected = wanted
 			? candidates.find((candidate) => candidate.id === wanted)
-			: candidates.find((candidate) => candidate.api === "openai-completions");
+			: candidates.find((candidate) => candidate.api === "openai-responses" || candidate.api === "openai-completions");
 		if (!selected) throw new Error(`no usable model; instance serves: ${candidates.map((c) => c.id)}`);
 		model = selected as Model<never>;
 

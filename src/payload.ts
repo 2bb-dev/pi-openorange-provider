@@ -9,10 +9,12 @@ const PROMPT_CACHE_KEY_MAX_LENGTH = 64;
  * Request fields OpenOrange needs that Pi does not send to a non-`api.openai.com`
  * endpoint:
  *
- * - `prompt_cache_key` pins a conversation to one upstream cache partition. Pi
- *   only sends it when the base URL is OpenAI's own, so requests through an
- *   OpenOrange instance land on arbitrary partitions and mostly miss the cache.
- *   Measured on a 14.8k-token prefix: 3/8 hits without the key, 7/8 with it.
+ * - `prompt_cache_key` pins a conversation to one upstream cache partition. On
+ *   the Chat Completions surface Pi only sends it when the base URL is OpenAI's
+ *   own, so requests through an OpenOrange instance land on arbitrary partitions
+ *   and mostly miss the cache. Measured on a 14.8k-token prefix: 3/8 hits
+ *   without the key, 7/8 with it. The Responses surface already sends it; the
+ *   caller's value is never overridden.
  * - `user` / `metadata.user_id` attribute spend to the user the inference key
  *   belongs to, so LiteLLM records it as `end_user`.
  *
