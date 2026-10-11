@@ -42,7 +42,7 @@ export function createOpenOrangeProvider(): Provider<Api> {
 				async login(interaction: AuthInteraction): Promise<ApiKeyCredential> {
 					const entered = await interaction.prompt({
 						type: "text",
-						message: "OpenOrange instance URL",
+						message: "OpenOrange Sunport address",
 						placeholder: process.env[BASE_URL_ENV] ?? "https://acme.openorange.ai",
 					});
 					const instanceUrl = normalizeBaseUrl(entered.trim() || process.env[BASE_URL_ENV] || "");

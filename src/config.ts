@@ -16,27 +16,27 @@ export const USER_ID_ENV = "OPENORANGE_USER_ID";
  */
 export function normalizeBaseUrl(input: string): string {
 	const raw = input.trim();
-	if (!raw) throw new Error("OpenOrange instance URL is required");
+	if (!raw) throw new Error("OpenOrange Sunport address is required");
 
 	const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
 	let url: URL;
 	try {
 		url = new URL(withScheme);
 	} catch {
-		throw new Error(`Invalid OpenOrange instance URL: ${raw}`);
+		throw new Error(`Invalid OpenOrange Sunport address: ${raw}`);
 	}
 
 	if (url.protocol !== "https:") {
-		throw new Error(`OpenOrange instance URL must use https, got: ${url.protocol}//`);
+		throw new Error(`OpenOrange Sunport address must use https, got: ${url.protocol}//`);
 	}
 	if (isLoopbackHost(url.hostname)) {
-		throw new Error(`OpenOrange instance URL must be a remote host, got: ${url.hostname}`);
+		throw new Error(`OpenOrange Sunport address must be a remote host, got: ${url.hostname}`);
 	}
 
 	// Accept pasted endpoints such as https://host/v1 or https://host/v1/ and keep the instance root.
 	const path = url.pathname.replace(/\/+$/, "");
 	if (path && path !== "/v1") {
-		throw new Error(`OpenOrange instance URL must be the instance root, got path: ${path}`);
+		throw new Error(`OpenOrange Sunport address must be the Sunport root, got path: ${path}`);
 	}
 	return `${url.protocol}//${url.host}`;
 }

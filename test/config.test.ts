@@ -25,7 +25,7 @@ describe("normalizeBaseUrl", () => {
 	);
 
 	it("rejects an unrelated path", () => {
-		expect(() => normalizeBaseUrl("https://acme.openorange.ai/api")).toThrow(/instance root/);
+		expect(() => normalizeBaseUrl("https://acme.openorange.ai/api")).toThrow(/Sunport root/);
 	});
 
 	it("rejects empty input", () => {

@@ -62,7 +62,7 @@ async function request(
 		signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
 	}).catch((error: unknown) => {
 		throw new OpenOrangeApiError(
-			`OpenOrange instance unreachable at ${instanceUrl}${path}: ${errorMessage(error)}`,
+			`OpenOrange Sunport unreachable at ${instanceUrl}${path}: ${errorMessage(error)}`,
 		);
 	});
 
