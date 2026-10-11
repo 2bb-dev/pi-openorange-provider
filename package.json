@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Pi model provider for OpenOrange instances (LiteLLM inference endpoint)",
+  "description": "Pi model provider for OpenOrange Sunports (LiteLLM inference endpoint)",
   "keywords": ["pi-package"],
   "license": "UNLICENSED",
   "pi": {
