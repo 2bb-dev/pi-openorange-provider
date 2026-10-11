@@ -132,8 +132,8 @@ export function toModels(deployments: LitellmDeployment[], instanceUrl: string):
 }
 
 /**
- * Deployments behind the instance's upstream proxy (`litellm_proxy/...`) carry no
- * LiteLLM capability flags, so the instance declares Pi metadata instead:
+ * Deployments behind the Sunport's upstream proxy (`litellm_proxy/...`) carry no
+ * LiteLLM capability flags, so the Sunport declares Pi metadata instead:
  * `pi_api`, `pi_reasoning`, `pi_thinking_level_map`, `pi_compat`. LiteLLM's own
  * `supports_*` flags are the fallback for directly-configured deployments.
  */
@@ -165,7 +165,7 @@ function toModel(
 		baseUrl: api === "anthropic-messages" ? anthropicBaseUrl(instanceUrl) : openAiBaseUrl(instanceUrl),
 		reasoning,
 		...(reasoning && thinkingLevelMap ? { thinkingLevelMap } : {}),
-		// Vision is assumed unless the instance denies it: proxied Claude/GPT
+		// Vision is assumed unless the Sunport denies it: proxied Claude/GPT
 		// deployments omit `supports_vision`, and Pi silently drops images otherwise.
 		input: booleanOrUndefined(info["supports_vision"]) === false ? ["text"] : ["text", "image"],
 		cost: {

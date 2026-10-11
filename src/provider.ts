@@ -107,7 +107,7 @@ export function createOpenOrangeProvider(): Provider<Api> {
 		async refreshModels(context: RefreshModelsContext): Promise<void> {
 			const instanceUrl = credentialInstanceUrl(context.credential) ?? envInstanceUrl();
 			if (context.stored) {
-				// Drop a catalog cached for a different instance.
+				// Drop a catalog cached for a different Sunport.
 				const restored = context.stored.models.filter(
 					(model) => model.provider === PROVIDER_ID && belongsTo(model, instanceUrl),
 				);

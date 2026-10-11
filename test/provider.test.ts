@@ -90,7 +90,7 @@ afterEach(() => {
 });
 
 describe("login", () => {
-	it("stores the instance, the key, and the key owner", async () => {
+	it("stores the Sunport, the key, and the key owner", async () => {
 		stubInstance();
 		const provider = createOpenOrangeProvider();
 		const credential = await provider.auth.apiKey?.login?.(
@@ -107,7 +107,7 @@ describe("login", () => {
 		]);
 	});
 
-	it("rejects a localhost instance before asking for the key", async () => {
+	it("rejects a localhost Sunport before asking for the key", async () => {
 		stubInstance();
 		const provider = createOpenOrangeProvider();
 		await expect(
@@ -115,7 +115,7 @@ describe("login", () => {
 		).rejects.toThrow(/https/);
 	});
 
-	it("fails when the key is rejected by the instance", async () => {
+	it("fails when the key is rejected by the Sunport", async () => {
 		vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 401 })));
 		const provider = createOpenOrangeProvider();
 		await expect(
@@ -203,7 +203,7 @@ describe("resolve", () => {
 		).resolves.toBeUndefined();
 	});
 
-	it("is unconfigured when the stored instance URL is not usable", async () => {
+	it("is unconfigured when the stored Sunport address is not usable", async () => {
 		const provider = createOpenOrangeProvider();
 		await expect(
 			provider.auth.apiKey?.resolve({
@@ -222,7 +222,7 @@ describe("refreshModels", () => {
 		env: { OPENORANGE_BASE_URL: INSTANCE },
 	};
 
-	it("fetches and persists the instance catalog", async () => {
+	it("fetches and persists the Sunport catalog", async () => {
 		stubInstance();
 		const provider = createOpenOrangeProvider();
 		const store = memoryStore();
@@ -250,7 +250,7 @@ describe("refreshModels", () => {
 		expect(offline.getModels()).toHaveLength(2);
 	});
 
-	it("drops a catalog cached for another instance", async () => {
+	it("drops a catalog cached for another Sunport", async () => {
 		stubInstance();
 		const store = memoryStore();
 		const first = createOpenOrangeProvider();
