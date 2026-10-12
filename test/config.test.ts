@@ -7,7 +7,7 @@ describe("normalizeBaseUrl", () => {
 		expect(normalizeBaseUrl("acme.openorange.ai")).toBe("https://acme.openorange.ai");
 	});
 
-	it("keeps the instance root when a /v1 endpoint is pasted", () => {
+	it("keeps the Sunport root when a /v1 endpoint is pasted", () => {
 		expect(normalizeBaseUrl("https://acme.openorange.ai/v1/")).toBe("https://acme.openorange.ai");
 	});
 
@@ -25,7 +25,7 @@ describe("normalizeBaseUrl", () => {
 	);
 
 	it("rejects an unrelated path", () => {
-		expect(() => normalizeBaseUrl("https://acme.openorange.ai/api")).toThrow(/instance root/);
+		expect(() => normalizeBaseUrl("https://acme.openorange.ai/api")).toThrow(/Sunport root/);
 	});
 
 	it("rejects empty input", () => {
@@ -38,7 +38,7 @@ describe("api base urls", () => {
 		expect(openAiBaseUrl("https://acme.openorange.ai")).toBe("https://acme.openorange.ai/v1");
 	});
 
-	it("uses the instance root for the Anthropic surface", () => {
+	it("uses the Sunport root for the Anthropic surface", () => {
 		// The Anthropic SDK appends /v1/messages itself.
 		expect(anthropicBaseUrl("https://acme.openorange.ai")).toBe("https://acme.openorange.ai");
 	});

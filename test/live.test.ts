@@ -1,4 +1,4 @@
-// Live checks against a real OpenOrange instance. Skipped unless both
+// Live checks against a real OpenOrange Sunport. Skipped unless both
 // OPENORANGE_BASE_URL and OPENORANGE_API_KEY are set:
 //
 //   OPENORANGE_BASE_URL=https://acme.openorange.ai OPENORANGE_API_KEY=sk-... \
@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = Array.from(
 		`Rule ${i}: the operator must keep runtime mutations diffable, approvable, idempotent, backed up, smoke-tested, rollbackable, and audited.`,
 ).join("\n");
 
-describe.skipIf(!live)("live instance", () => {
+describe.skipIf(!live)("live Sunport", () => {
 	const provider = createOpenOrangeProvider();
 	let model: Model<never>;
 	let sent: Record<string, unknown>[] = [];
@@ -48,7 +48,7 @@ describe.skipIf(!live)("live instance", () => {
 		const selected = wanted
 			? candidates.find((candidate) => candidate.id === wanted)
 			: candidates.find((candidate) => candidate.api === "openai-responses" || candidate.api === "openai-completions");
-		if (!selected) throw new Error(`no usable model; instance serves: ${candidates.map((c) => c.id)}`);
+		if (!selected) throw new Error(`no usable model; Sunport serves: ${candidates.map((c) => c.id)}`);
 		model = selected as Model<never>;
 
 		const realFetch = globalThis.fetch;

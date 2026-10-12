@@ -1,7 +1,7 @@
 export const PROVIDER_ID = "openorange";
 export const PROVIDER_NAME = "OpenOrange";
 
-/** Instance root, e.g. https://acme.openorange.ai (LiteLLM is served from the apex host). */
+/** Sunport root, e.g. https://acme.openorange.ai (LiteLLM is served from the apex host). */
 export const BASE_URL_ENV = "OPENORANGE_BASE_URL";
 /** Inference key (LiteLLM virtual key) issued by the OpenOrange console. */
 export const API_KEY_ENV = "OPENORANGE_API_KEY";
@@ -10,33 +10,33 @@ export const USER_ID_ENV = "OPENORANGE_USER_ID";
 
 /**
  * OpenOrange serves LiteLLM on the apex host and the web console on `web.<host>`
- * (deploy/nginx/templates/llm.conf.template). Only public HTTPS instances are
+ * (deploy/nginx/templates/llm.conf.template). Only public HTTPS Sunports are
  * accepted: an inference key is a bearer secret and loopback/plain-HTTP targets
- * are not OpenOrange instances.
+ * are not OpenOrange Sunports.
  */
 export function normalizeBaseUrl(input: string): string {
 	const raw = input.trim();
-	if (!raw) throw new Error("OpenOrange instance URL is required");
+	if (!raw) throw new Error("OpenOrange Sunport address is required");
 
 	const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
 	let url: URL;
 	try {
 		url = new URL(withScheme);
 	} catch {
-		throw new Error(`Invalid OpenOrange instance URL: ${raw}`);
+		throw new Error(`Invalid OpenOrange Sunport address: ${raw}`);
 	}
 
 	if (url.protocol !== "https:") {
-		throw new Error(`OpenOrange instance URL must use https, got: ${url.protocol}//`);
+		throw new Error(`OpenOrange Sunport address must use https, got: ${url.protocol}//`);
 	}
 	if (isLoopbackHost(url.hostname)) {
-		throw new Error(`OpenOrange instance URL must be a remote host, got: ${url.hostname}`);
+		throw new Error(`OpenOrange Sunport address must be a remote host, got: ${url.hostname}`);
 	}
 
-	// Accept pasted endpoints such as https://host/v1 or https://host/v1/ and keep the instance root.
+	// Accept pasted endpoints such as https://host/v1 or https://host/v1/ and keep the Sunport root.
 	const path = url.pathname.replace(/\/+$/, "");
 	if (path && path !== "/v1") {
-		throw new Error(`OpenOrange instance URL must be the instance root, got path: ${path}`);
+		throw new Error(`OpenOrange Sunport address must be the Sunport root, got path: ${path}`);
 	}
 	return `${url.protocol}//${url.host}`;
 }

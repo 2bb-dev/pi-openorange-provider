@@ -35,7 +35,7 @@ const DEPLOYMENTS = [
 	{ model_name: "groq/whisper-large-v3-turbo", model_info: { mode: "audio_transcription" } },
 ];
 
-/** Deployments as an instance renders them behind its upstream proxy: no
+/** Deployments as a Sunport renders them behind its upstream proxy: no
  * LiteLLM `supports_*` flags, Pi metadata instead. */
 const PROXIED = [
 	{
@@ -98,7 +98,7 @@ describe("toModels", () => {
 		expect(models[0]?.cost).toEqual({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 });
 	});
 
-	it("carries capability and window metadata from the instance", () => {
+	it("carries capability and window metadata from the Sunport", () => {
 		expect(models[0]).toMatchObject({
 			reasoning: true,
 			input: ["text", "image"],
@@ -107,7 +107,7 @@ describe("toModels", () => {
 		});
 	});
 
-	it("falls back to safe defaults when the instance omits metadata", () => {
+	it("falls back to safe defaults when the Sunport omits metadata", () => {
 		expect(models[1]).toMatchObject({
 			reasoning: true,
 			input: ["text", "image"],
@@ -117,7 +117,7 @@ describe("toModels", () => {
 		});
 	});
 
-	it("only drops image input when the instance denies vision", () => {
+	it("only drops image input when the Sunport denies vision", () => {
 		const proxied = toModels(PROXIED, INSTANCE);
 		expect(proxied.find((m) => m.id === "deepseek/deepseek-v4-pro")?.input).toEqual(["text"]);
 		expect(proxied.find((m) => m.id === "anthropic/claude-haiku-4-5")?.input).toEqual(["text", "image"]);
@@ -205,7 +205,7 @@ describe("litellm requests", () => {
 		await expect(fetchDeployments(INSTANCE, "sk-bad")).rejects.toThrow(/invalid inference key/);
 	});
 
-	it("reports an unreachable instance", async () => {
+	it("reports an unreachable Sunport", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => {

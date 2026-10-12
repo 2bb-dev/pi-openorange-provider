@@ -1,7 +1,7 @@
 # pi-openorange-provider
 
 Pi extension that registers **OpenOrange** as a model provider, so `/login` can
-sign in to an OpenOrange instance and `/model` can pick any model that instance
+sign in to an OpenOrange Sunport and `/model` can pick any model that Sunport
 serves.
 
 ## Install
@@ -24,13 +24,13 @@ pi -e git:github.com/2bb-dev/pi-openorange-provider
 
 The flow asks for two things:
 
-1. **Instance URL** — the OpenOrange instance root, e.g.
+1. **Sunport address** — the root URL of your OpenOrange Sunport, e.g.
    `https://acme.openorange.ai`. Prefilled from `OPENORANGE_BASE_URL`.
    Only public HTTPS hosts are accepted; loopback/plain HTTP is rejected.
 2. **Inference key** — the `sk-...` key issued in the OpenOrange console under
    *API keys*.
 
-Login verifies the key against the instance and stores it in
+Login verifies the key against the Sunport and stores it in
 `~/.pi/agent/auth.json`. `/login openorange` jumps straight to it.
 
 Headless/CI use needs no login:
@@ -42,26 +42,26 @@ export OPENORANGE_API_KEY=sk-...
 
 ## What it does
 
-**Model catalog.** The model list is fetched from the instance
+**Model catalog.** The model list is fetched from the Sunport
 (`GET /v1/model/info`) with your key, so you see exactly the models that key is
-allowed to use, with the instance's own context windows, pricing, and
+allowed to use, with the Sunport's own context windows, pricing, and
 capabilities. Non-chat deployments (embeddings, speech) and per-subscription
 slot aliases (`openai/gpt-5.5/2`) are hidden.
 
 **Routing.** Each deployment declares its Pi protocol in `model_info.pi_api`
 (the same contract OpenOrange Code uses): `openai-responses` models go to
 `POST /v1/responses` so reasoning summaries and encrypted reasoning replay work,
-`anthropic/*` models go to the instance's Anthropic surface
+`anthropic/*` models go to the Sunport's Anthropic surface
 (`POST /v1/messages`) for native prompt caching and thinking, and everything
 else uses `POST /v1/chat/completions`. Without `pi_api`, `mode: responses`
 selects the Responses surface and Claude aliases the Anthropic one.
 
 **Capabilities.** Deployments proxied through the OpenOrange upstream carry no
-LiteLLM `supports_*` flags, so thinking and vision come from the instance's Pi
+LiteLLM `supports_*` flags, so thinking and vision come from the Sunport's Pi
 metadata: `pi_reasoning`, `pi_thinking_level_map`, and `pi_compat` (for
 example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5
 need and is applied by default for them). Image input is enabled unless the
-instance sets `supports_vision: false`; Pi drops images for text-only models
+Sunport sets `supports_vision: false`; Pi drops images for text-only models
 before the request is sent.
 
 **Spend attribution.** Requests carry the LiteLLM user the inference key belongs
@@ -71,7 +71,7 @@ that user.
 
 **Prompt caching.** On the Anthropic surface Pi already emits `cache_control`
 blocks. On the OpenAI surface Pi only sends `prompt_cache_key` when the base URL
-is `api.openai.com`, so requests to an OpenOrange instance carried no cache
+is `api.openai.com`, so requests to an OpenOrange Sunport carried no cache
 affinity at all; this extension adds it, keyed by the Pi session id. It is
 skipped when the caller disables caching or already set a key.
 
@@ -80,7 +80,7 @@ hits do occur but are backend-controlled and unreliable — 0–25% on a cold
 prefix, 60–85% once the prefix is hot — and `prompt_cache_key` did not move
 those numbers on that route. The parameter is still correct to send (the
 OpenOrange LiteLLM fork forwards it to the Codex backend as a `session_id`
-header); the remaining loss is upstream of Pi, in the instance's proxy chain.
+header); the remaining loss is upstream of Pi, in the Sunport's proxy chain.
 
 ## Development
 
@@ -93,7 +93,7 @@ npm test
 npm run typecheck
 ```
 
-`test/live.test.ts` runs against a real instance and is skipped unless
+`test/live.test.ts` runs against a real Sunport and is skipped unless
 credentials are present. It costs real tokens (~15k input per request):
 
 ```bash
@@ -107,4 +107,4 @@ OPENORANGE_BASE_URL=https://acme.openorange.ai OPENORANGE_API_KEY=sk-... \
 | `src/provider.ts` | Provider: login, auth resolution, model refresh, streaming |
 | `src/litellm.ts` | LiteLLM client and catalog → Pi model mapping (`pi_*` metadata) |
 | `src/payload.ts` | Cache-affinity and spend-attribution payload fields |
-| `src/config.ts` | Instance URL rules and endpoint layout |
+| `src/config.ts` | Sunport address rules and endpoint layout |
