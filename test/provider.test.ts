@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createOpenOrangeProvider } from "../src/provider.js";
 
-const INSTANCE = "https://acme.openorange.ai";
+const SUNPORT = "https://acme.openorange.ai";
 
 const MODEL_INFO = {
 	data: [
@@ -25,7 +25,7 @@ const MODEL_INFO = {
 	],
 };
 
-function stubInstance(overrides: Record<string, unknown> = {}) {
+function stubSunport(overrides: Record<string, unknown> = {}) {
 	const fetchMock = vi.fn(async (url: string | URL) => {
 		const path = new URL(String(url)).pathname;
 		if (path === "/v1/model/info") return Response.json(overrides["modelInfo"] ?? MODEL_INFO);
@@ -91,7 +91,7 @@ afterEach(() => {
 
 describe("login", () => {
 	it("stores the Sunport, the key, and the key owner", async () => {
-		stubInstance();
+		stubSunport();
 		const provider = createOpenOrangeProvider();
 		const credential = await provider.auth.apiKey?.login?.(
 			interaction(["acme.openorange.ai", "sk-test"]),
@@ -99,7 +99,7 @@ describe("login", () => {
 		expect(credential).toEqual({
 			type: "api_key",
 			key: "sk-test",
-			env: { OPENORANGE_BASE_URL: INSTANCE, OPENORANGE_USER_ID: "sasha" },
+			env: { OPENORANGE_BASE_URL: SUNPORT, OPENORANGE_USER_ID: "sasha" },
 		});
 		expect(provider.getModels().map((model) => model.id)).toEqual([
 			"anthropic/claude-sonnet-5",
@@ -108,7 +108,7 @@ describe("login", () => {
 	});
 
 	it("rejects a localhost Sunport before asking for the key", async () => {
-		stubInstance();
+		stubSunport();
 		const provider = createOpenOrangeProvider();
 		await expect(
 			provider.auth.apiKey?.login?.(interaction(["http://localhost:4000", "sk-test"])),
@@ -124,7 +124,7 @@ describe("login", () => {
 	});
 
 	it("still logs in when /key/info is unavailable", async () => {
-		stubInstance({ keyInfo: undefined });
+		stubSunport({ keyInfo: undefined });
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async (url: string | URL) =>
@@ -139,12 +139,12 @@ describe("login", () => {
 		).resolves.toEqual({
 			type: "api_key",
 			key: "sk-test",
-			env: { OPENORANGE_BASE_URL: INSTANCE },
+			env: { OPENORANGE_BASE_URL: SUNPORT },
 		});
 	});
 
 	it("synchronizes Pi model state after login", async () => {
-		stubInstance();
+		stubSunport();
 		const runtime = await ModelRuntime.create({
 			credentials: new InMemoryCredentialStore(),
 			modelsStore: new InMemoryModelsStore(),
@@ -166,7 +166,7 @@ describe("resolve", () => {
 	const credential: ApiKeyCredential = {
 		type: "api_key",
 		key: "sk-test",
-		env: { OPENORANGE_BASE_URL: INSTANCE, OPENORANGE_USER_ID: "sasha" },
+		env: { OPENORANGE_BASE_URL: SUNPORT, OPENORANGE_USER_ID: "sasha" },
 	};
 
 	it("uses the stored credential", async () => {
@@ -175,7 +175,7 @@ describe("resolve", () => {
 			provider.auth.apiKey?.resolve({ ctx: authContext(), credential, signal: operationSignal() }),
 		).resolves.toEqual({
 			auth: { apiKey: "sk-test" },
-			env: { OPENORANGE_BASE_URL: INSTANCE, OPENORANGE_USER_ID: "sasha" },
+			env: { OPENORANGE_BASE_URL: SUNPORT, OPENORANGE_USER_ID: "sasha" },
 			source: `stored credential (acme.openorange.ai)`,
 		});
 	});
@@ -190,14 +190,14 @@ describe("resolve", () => {
 			provider.auth.apiKey?.resolve({ ctx, credential: undefined, signal: operationSignal() }),
 		).resolves.toEqual({
 			auth: { apiKey: "sk-env" },
-			env: { OPENORANGE_BASE_URL: INSTANCE },
+			env: { OPENORANGE_BASE_URL: SUNPORT },
 			source: "OPENORANGE_BASE_URL (acme.openorange.ai)",
 		});
 	});
 
 	it("is unconfigured without a key", async () => {
 		const provider = createOpenOrangeProvider();
-		const ctx = authContext({ OPENORANGE_BASE_URL: INSTANCE });
+		const ctx = authContext({ OPENORANGE_BASE_URL: SUNPORT });
 		await expect(
 			provider.auth.apiKey?.resolve({ ctx, credential: undefined, signal: operationSignal() }),
 		).resolves.toBeUndefined();
@@ -219,11 +219,11 @@ describe("refreshModels", () => {
 	const credential: ApiKeyCredential = {
 		type: "api_key",
 		key: "sk-test",
-		env: { OPENORANGE_BASE_URL: INSTANCE },
+		env: { OPENORANGE_BASE_URL: SUNPORT },
 	};
 
 	it("fetches and persists the Sunport catalog", async () => {
-		stubInstance();
+		stubSunport();
 		const provider = createOpenOrangeProvider();
 		const store = memoryStore();
 		await provider.refreshModels?.(store.context(credential, true));
@@ -232,7 +232,7 @@ describe("refreshModels", () => {
 	});
 
 	it("serves the cached catalog offline", async () => {
-		stubInstance();
+		stubSunport();
 		const first = createOpenOrangeProvider();
 		await first.auth.apiKey?.login?.(interaction(["acme.openorange.ai", "sk-test"]));
 
@@ -251,7 +251,7 @@ describe("refreshModels", () => {
 	});
 
 	it("drops a catalog cached for another Sunport", async () => {
-		stubInstance();
+		stubSunport();
 		const store = memoryStore();
 		const first = createOpenOrangeProvider();
 		await first.refreshModels?.(store.context(credential, true));
@@ -267,7 +267,7 @@ describe("refreshModels", () => {
 	});
 
 	it("does nothing without configuration", async () => {
-		const fetchMock = stubInstance();
+		const fetchMock = stubSunport();
 		const provider = createOpenOrangeProvider();
 		await provider.refreshModels?.(memoryStore().context(undefined, true));
 		expect(fetchMock).not.toHaveBeenCalled();

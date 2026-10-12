@@ -23,7 +23,7 @@ import {
 import { type LitellmKeyIdentity, fetchDeployments, fetchKeyIdentity, toModels } from "./litellm.js";
 
 interface ResolvedConfig {
-	instanceUrl: string;
+	sunportUrl: string;
 	apiKey: string;
 	userId?: string;
 	fromCredential: boolean;
@@ -45,7 +45,7 @@ export function createOpenOrangeProvider(): Provider<Api> {
 						message: "OpenOrange Sunport address",
 						placeholder: process.env[BASE_URL_ENV] ?? "https://acme.openorange.ai",
 					});
-					const instanceUrl = normalizeBaseUrl(entered.trim() || process.env[BASE_URL_ENV] || "");
+					const sunportUrl = normalizeBaseUrl(entered.trim() || process.env[BASE_URL_ENV] || "");
 
 					const apiKey = (
 						await interaction.prompt({
@@ -56,16 +56,16 @@ export function createOpenOrangeProvider(): Provider<Api> {
 					if (!apiKey) throw new Error("An OpenOrange inference key is required");
 
 					// Fail the login here rather than on the first model request.
-					const deployments = await fetchDeployments(instanceUrl, apiKey, interaction.signal);
+					const deployments = await fetchDeployments(sunportUrl, apiKey, interaction.signal);
 					const identity: LitellmKeyIdentity = await fetchKeyIdentity(
-						instanceUrl,
+						sunportUrl,
 						apiKey,
 						interaction.signal,
 					).catch(() => ({}) as LitellmKeyIdentity);
-					models = toModels(deployments, instanceUrl);
+					models = toModels(deployments, sunportUrl);
 					interaction.notify({
 						type: "info",
-						message: `OpenOrange: ${models.length} model(s) available on ${hostOf(instanceUrl)}`,
+						message: `OpenOrange: ${models.length} model(s) available on ${hostOf(sunportUrl)}`,
 					});
 
 					const userId = identity.userId ?? identity.keyAlias;
@@ -73,7 +73,7 @@ export function createOpenOrangeProvider(): Provider<Api> {
 						type: "api_key",
 						key: apiKey,
 						env: {
-							[BASE_URL_ENV]: instanceUrl,
+							[BASE_URL_ENV]: sunportUrl,
 							...(userId ? { [USER_ID_ENV]: userId } : {}),
 						},
 					};
@@ -90,7 +90,7 @@ export function createOpenOrangeProvider(): Provider<Api> {
 					const config = await resolveConfig(ctx, credential);
 					if (!config) return undefined;
 					const env: ProviderEnv = {
-						[BASE_URL_ENV]: config.instanceUrl,
+						[BASE_URL_ENV]: config.sunportUrl,
 						...(config.userId ? { [USER_ID_ENV]: config.userId } : {}),
 					};
 					return {
@@ -105,11 +105,11 @@ export function createOpenOrangeProvider(): Provider<Api> {
 		getModels: () => models,
 
 		async refreshModels(context: RefreshModelsContext): Promise<void> {
-			const instanceUrl = credentialInstanceUrl(context.credential) ?? envInstanceUrl();
+			const sunportUrl = credentialSunportUrl(context.credential) ?? envSunportUrl();
 			if (context.stored) {
 				// Drop a catalog cached for a different Sunport.
 				const restored = context.stored.models.filter(
-					(model) => model.provider === PROVIDER_ID && belongsTo(model, instanceUrl),
+					(model) => model.provider === PROVIDER_ID && belongsTo(model, sunportUrl),
 				);
 				const published = await context.publish({
 					update: () => {
@@ -119,16 +119,16 @@ export function createOpenOrangeProvider(): Provider<Api> {
 				if (!published) return;
 			}
 			if (!context.allowNetwork || context.signal.aborted) return;
-			if (!instanceUrl) return;
+			if (!sunportUrl) return;
 
 			const apiKey =
 				(context.credential?.type === "api_key" ? context.credential.key : undefined) ??
 				process.env[API_KEY_ENV]?.trim();
 			if (!apiKey) return;
 
-			const deployments = await fetchDeployments(instanceUrl, apiKey, context.signal);
+			const deployments = await fetchDeployments(sunportUrl, apiKey, context.signal);
 			if (context.signal.aborted) return;
-			const refreshed = toModels(deployments, instanceUrl);
+			const refreshed = toModels(deployments, sunportUrl);
 			await context.publish({
 				persist: { models: refreshed, checkedAt: Date.now() },
 				update: () => {
@@ -152,26 +152,26 @@ async function resolveConfig(
 	const apiKey = credential?.key ?? (await ctx.env(API_KEY_ENV));
 	if (!rawUrl?.trim() || !apiKey?.trim()) return undefined;
 
-	let instanceUrl: string;
+	let sunportUrl: string;
 	try {
-		instanceUrl = normalizeBaseUrl(rawUrl);
+		sunportUrl = normalizeBaseUrl(rawUrl);
 	} catch {
 		return undefined;
 	}
 	return {
-		instanceUrl,
+		sunportUrl,
 		apiKey: apiKey.trim(),
 		userId: credential?.env?.[USER_ID_ENV],
 		fromCredential: Boolean(credential?.key),
 	};
 }
 
-function credentialInstanceUrl(credential: RefreshModelsContext["credential"]): string | undefined {
+function credentialSunportUrl(credential: RefreshModelsContext["credential"]): string | undefined {
 	if (credential?.type !== "api_key") return undefined;
 	return safeNormalize(credential.env?.[BASE_URL_ENV]);
 }
 
-function envInstanceUrl(): string | undefined {
+function envSunportUrl(): string | undefined {
 	return safeNormalize(process.env[BASE_URL_ENV]);
 }
 
@@ -184,20 +184,20 @@ function safeNormalize(value: string | undefined): string | undefined {
 	}
 }
 
-function belongsTo(model: Model<Api>, instanceUrl: string | undefined): boolean {
-	return instanceUrl ? model.baseUrl.startsWith(instanceUrl) : false;
+function belongsTo(model: Model<Api>, sunportUrl: string | undefined): boolean {
+	return sunportUrl ? model.baseUrl.startsWith(sunportUrl) : false;
 }
 
 function sourceLabel(config: ResolvedConfig): string {
 	return config.fromCredential
-		? `stored credential (${hostOf(config.instanceUrl)})`
-		: `${BASE_URL_ENV} (${hostOf(config.instanceUrl)})`;
+		? `stored credential (${hostOf(config.sunportUrl)})`
+		: `${BASE_URL_ENV} (${hostOf(config.sunportUrl)})`;
 }
 
-function hostOf(instanceUrl: string): string {
+function hostOf(sunportUrl: string): string {
 	try {
-		return new URL(instanceUrl).host;
+		return new URL(sunportUrl).host;
 	} catch {
-		return instanceUrl;
+		return sunportUrl;
 	}
 }
