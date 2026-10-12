@@ -92,7 +92,7 @@ const SLOT_ALIAS = /\/\d+$/;
 
 /**
  * Pi request protocols an OpenOrange deployment may declare in `model_info.pi_api`.
- * Same contract OpenOrange Code reads (services/operator-api/src/code/modelApi.ts).
+ * Same contract OpenOrange Code reads (services/openorange-api/src/code/modelApi.ts).
  */
 const PI_APIS = new Set(["openai-responses", "openai-completions", "anthropic-messages"]);
 
