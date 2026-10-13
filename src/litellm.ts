@@ -28,21 +28,21 @@ export class OpenOrangeApiError extends Error {
 }
 
 export async function fetchDeployments(
-	instanceUrl: string,
+	sunportUrl: string,
 	apiKey: string,
 	signal?: AbortSignal,
 ): Promise<LitellmDeployment[]> {
-	const body = await request(instanceUrl, "/v1/model/info", apiKey, signal);
+	const body = await request(sunportUrl, "/v1/model/info", apiKey, signal);
 	const data = (body as { data?: unknown }).data;
 	return Array.isArray(data) ? (data as LitellmDeployment[]) : [];
 }
 
 export async function fetchKeyIdentity(
-	instanceUrl: string,
+	sunportUrl: string,
 	apiKey: string,
 	signal?: AbortSignal,
 ): Promise<LitellmKeyIdentity> {
-	const body = await request(instanceUrl, "/key/info", apiKey, signal);
+	const body = await request(sunportUrl, "/key/info", apiKey, signal);
 	const info = (body as { info?: Record<string, unknown> }).info ?? {};
 	return {
 		userId: stringOrUndefined(info["user_id"]),
@@ -51,18 +51,18 @@ export async function fetchKeyIdentity(
 }
 
 async function request(
-	instanceUrl: string,
+	sunportUrl: string,
 	path: string,
 	apiKey: string,
 	signal?: AbortSignal,
 ): Promise<unknown> {
 	const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-	const response = await fetch(`${instanceUrl}${path}`, {
+	const response = await fetch(`${sunportUrl}${path}`, {
 		headers: { authorization: `Bearer ${apiKey}`, accept: "application/json" },
 		signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
 	}).catch((error: unknown) => {
 		throw new OpenOrangeApiError(
-			`OpenOrange Sunport unreachable at ${instanceUrl}${path}: ${errorMessage(error)}`,
+			`OpenOrange Sunport unreachable at ${sunportUrl}${path}: ${errorMessage(error)}`,
 		);
 	});
 
@@ -92,7 +92,7 @@ const SLOT_ALIAS = /\/\d+$/;
 
 /**
  * Pi request protocols an OpenOrange deployment may declare in `model_info.pi_api`.
- * Same contract OpenOrange Code reads (services/operator-api/src/code/modelApi.ts).
+ * Same contract OpenOrange Code reads (services/openorange-api/src/code/modelApi.ts).
  */
 const PI_APIS = new Set(["openai-responses", "openai-completions", "anthropic-messages"]);
 
@@ -113,7 +113,7 @@ const ADAPTIVE_THINKING_CLAUDE = [
 	"claude-sonnet-5",
 ];
 
-export function toModels(deployments: LitellmDeployment[], instanceUrl: string): Model<Api>[] {
+export function toModels(deployments: LitellmDeployment[], sunportUrl: string): Model<Api>[] {
 	const models: Model<Api>[] = [];
 	const seen = new Set<string>();
 
@@ -126,7 +126,7 @@ export function toModels(deployments: LitellmDeployment[], instanceUrl: string):
 		if (mode && NON_CHAT_MODES.has(mode)) continue;
 
 		seen.add(id);
-		models.push(toModel(id, info, upstreamModel(deployment), instanceUrl));
+		models.push(toModel(id, info, upstreamModel(deployment), sunportUrl));
 	}
 	return models.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -141,7 +141,7 @@ function toModel(
 	id: string,
 	info: Record<string, unknown>,
 	upstream: string | undefined,
-	instanceUrl: string,
+	sunportUrl: string,
 ): Model<Api> {
 	const api = resolveApi(id, info, upstream);
 	const contextWindow = numberOrUndefined(info["max_input_tokens"]) ?? 128_000;
@@ -162,7 +162,7 @@ function toModel(
 		name: id,
 		api,
 		provider: PROVIDER_ID,
-		baseUrl: api === "anthropic-messages" ? anthropicBaseUrl(instanceUrl) : openAiBaseUrl(instanceUrl),
+		baseUrl: api === "anthropic-messages" ? anthropicBaseUrl(sunportUrl) : openAiBaseUrl(sunportUrl),
 		reasoning,
 		...(reasoning && thinkingLevelMap ? { thinkingLevelMap } : {}),
 		// Vision is assumed unless the Sunport denies it: proxied Claude/GPT

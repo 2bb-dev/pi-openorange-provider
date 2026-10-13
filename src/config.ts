@@ -53,11 +53,11 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 /** OpenAI-compatible surface: POST {base}/v1/chat/completions. */
-export function openAiBaseUrl(instanceUrl: string): string {
-	return `${instanceUrl}/v1`;
+export function openAiBaseUrl(sunportUrl: string): string {
+	return `${sunportUrl}/v1`;
 }
 
 /** Anthropic surface: the SDK appends /v1/messages to this base. */
-export function anthropicBaseUrl(instanceUrl: string): string {
-	return instanceUrl;
+export function anthropicBaseUrl(sunportUrl: string): string {
+	return sunportUrl;
 }

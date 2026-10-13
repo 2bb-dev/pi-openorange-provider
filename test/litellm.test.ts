@@ -7,7 +7,7 @@ import {
 	toModels,
 } from "../src/litellm.js";
 
-const INSTANCE = "https://acme.openorange.ai";
+const SUNPORT = "https://acme.openorange.ai";
 
 const DEPLOYMENTS = [
 	{
@@ -82,7 +82,7 @@ const PROXIED = [
 ];
 
 describe("toModels", () => {
-	const models = toModels(DEPLOYMENTS, INSTANCE);
+	const models = toModels(DEPLOYMENTS, SUNPORT);
 
 	it("keeps only chat-capable deployments and drops slot aliases", () => {
 		expect(models.map((model) => model.id)).toEqual(["anthropic/claude-sonnet-5", "openai/gpt-5.5"]);
@@ -90,8 +90,8 @@ describe("toModels", () => {
 
 	it("routes anthropic aliases to /v1/messages and responses deployments to /v1/responses", () => {
 		const [claude, gpt] = models;
-		expect(claude).toMatchObject({ api: "anthropic-messages", baseUrl: INSTANCE });
-		expect(gpt).toMatchObject({ api: "openai-responses", baseUrl: `${INSTANCE}/v1` });
+		expect(claude).toMatchObject({ api: "anthropic-messages", baseUrl: SUNPORT });
+		expect(gpt).toMatchObject({ api: "openai-responses", baseUrl: `${SUNPORT}/v1` });
 	});
 
 	it("converts per-token prices to per-million", () => {
@@ -118,30 +118,30 @@ describe("toModels", () => {
 	});
 
 	it("only drops image input when the Sunport denies vision", () => {
-		const proxied = toModels(PROXIED, INSTANCE);
+		const proxied = toModels(PROXIED, SUNPORT);
 		expect(proxied.find((m) => m.id === "deepseek/deepseek-v4-pro")?.input).toEqual(["text"]);
 		expect(proxied.find((m) => m.id === "anthropic/claude-haiku-4-5")?.input).toEqual(["text", "image"]);
 	});
 
 	it("ignores deployments without a model name", () => {
-		expect(toModels([{ model_info: { mode: "chat" } }], INSTANCE)).toEqual([]);
+		expect(toModels([{ model_info: { mode: "chat" } }], SUNPORT)).toEqual([]);
 	});
 });
 
 describe("toModels with Pi metadata", () => {
-	const models = toModels(PROXIED, INSTANCE);
+	const models = toModels(PROXIED, SUNPORT);
 	const byId = (id: string) => models.find((model) => model.id === id);
 
 	it("honours the declared Pi API and reasoning flag", () => {
 		expect(byId("openai/gpt-5.6-luna")).toMatchObject({
 			api: "openai-responses",
-			baseUrl: `${INSTANCE}/v1`,
+			baseUrl: `${SUNPORT}/v1`,
 			reasoning: true,
 			thinkingLevelMap: { xhigh: "xhigh", max: "max" },
 		});
 		expect(byId("anthropic/claude-haiku-4-5")).toMatchObject({
 			api: "anthropic-messages",
-			baseUrl: INSTANCE,
+			baseUrl: SUNPORT,
 			reasoning: true,
 		});
 		expect(byId("anthropic/claude-haiku-4-5")).not.toHaveProperty("compat");
@@ -184,8 +184,8 @@ describe("litellm requests", () => {
 
 	it("sends the inference key as a bearer token", async () => {
 		const fetchMock = stubFetch(Response.json({ data: DEPLOYMENTS }));
-		await fetchDeployments(INSTANCE, "sk-test");
-		expect(fetchMock.mock.calls[0]?.[0]).toBe(`${INSTANCE}/v1/model/info`);
+		await fetchDeployments(SUNPORT, "sk-test");
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(`${SUNPORT}/v1/model/info`);
 		expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
 			authorization: "Bearer sk-test",
 		});
@@ -193,7 +193,7 @@ describe("litellm requests", () => {
 
 	it("reads the key owner from /key/info", async () => {
 		stubFetch(Response.json({ info: { user_id: "sasha", key_alias: "pi-sasha" } }));
-		await expect(fetchKeyIdentity(INSTANCE, "sk-test")).resolves.toEqual({
+		await expect(fetchKeyIdentity(SUNPORT, "sk-test")).resolves.toEqual({
 			userId: "sasha",
 			keyAlias: "pi-sasha",
 		});
@@ -201,8 +201,8 @@ describe("litellm requests", () => {
 
 	it("reports an unauthorized key", async () => {
 		stubFetch(new Response("nope", { status: 401, statusText: "Unauthorized" }));
-		await expect(fetchDeployments(INSTANCE, "sk-bad")).rejects.toThrow(OpenOrangeApiError);
-		await expect(fetchDeployments(INSTANCE, "sk-bad")).rejects.toThrow(/invalid inference key/);
+		await expect(fetchDeployments(SUNPORT, "sk-bad")).rejects.toThrow(OpenOrangeApiError);
+		await expect(fetchDeployments(SUNPORT, "sk-bad")).rejects.toThrow(/invalid inference key/);
 	});
 
 	it("reports an unreachable Sunport", async () => {
@@ -212,6 +212,6 @@ describe("litellm requests", () => {
 				throw new Error("getaddrinfo ENOTFOUND");
 			}),
 		);
-		await expect(fetchDeployments(INSTANCE, "sk-test")).rejects.toThrow(/unreachable/);
+		await expect(fetchDeployments(SUNPORT, "sk-test")).rejects.toThrow(/unreachable/);
 	});
 });
