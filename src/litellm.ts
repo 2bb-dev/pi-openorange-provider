@@ -101,6 +101,7 @@ const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "ma
  */
 const ADAPTIVE_THINKING_CLAUDE = [
 	"claude-fable-5",
+	"claude-haiku-5-5",
 	"claude-opus-4-6",
 	"claude-opus-4-7",
 	"claude-opus-4-8",

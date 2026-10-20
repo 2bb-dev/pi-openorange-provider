@@ -59,8 +59,8 @@ selects the Responses surface and Claude aliases the Anthropic one.
 **Capabilities.** Deployments proxied through the OpenOrange upstream carry no
 LiteLLM `supports_*` flags, so thinking and vision come from the Sunport's Pi
 metadata: `pi_reasoning`, `pi_thinking_level_map`, and `pi_compat` (for
-example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5
-need and is applied by default for them). Image input is enabled unless the
+example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5 /
+Haiku 5.5 need and is applied by default for them). Image input is enabled unless the
 Sunport sets `supports_vision: false`; Pi drops images for text-only models
 before the request is sent.
 

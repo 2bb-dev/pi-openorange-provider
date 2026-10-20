@@ -50,6 +50,12 @@ const PROXIED = [
 		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
 	},
 	{
+		// A model added with the Sunport's own Anthropic key: no pi_compat.
+		model_name: "anthropic/claude-haiku-5-5",
+		litellm_params: { model: "anthropic/claude-haiku-5-5" },
+		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
+	},
+	{
 		model_name: "anthropic/claude-fable-5",
 		litellm_params: { model: "litellm_proxy/anthropic/claude-fable-5" },
 		model_info: {
@@ -155,6 +161,7 @@ describe("toModels with Pi metadata", () => {
 
 	it("forces adaptive thinking on Claude models that reject budget thinking", () => {
 		expect(byId("anthropic/claude-opus-5")?.compat).toEqual({ forceAdaptiveThinking: true });
+		expect(byId("anthropic/claude-haiku-5-5")?.compat).toEqual({ forceAdaptiveThinking: true });
 	});
 
 	it("lets pi_compat override the adaptive fallback and keeps only scalar entries", () => {
