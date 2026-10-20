@@ -43,10 +43,12 @@ export OPENORANGE_API_KEY=sk-...
 ## What it does
 
 **Model catalog.** The model list is fetched from the Sunport
-(`GET /v1/model/info`) with your key, so you see exactly the models that key is
-allowed to use, with the Sunport's own context windows, pricing, and
-capabilities. Non-chat deployments (embeddings, speech) and per-subscription
-slot aliases (`openai/gpt-5.5/2`) are hidden.
+(`GET /v1/model/info`, limited to the models `GET /v1/models` lists) with your
+key, so you see exactly the models that key may use (on a free trial, only the
+models the trial includes), with the Sunport's own context windows, pricing,
+and capabilities. Deployments that are not chat models (embeddings, speech,
+images, video) and per-subscription slot aliases (`openai/gpt-5.5/2`) are
+hidden.
 
 **Routing.** Each deployment declares its Pi protocol in `model_info.pi_api`
 (the same contract OpenOrange Code uses): `openai-responses` models go to
@@ -59,8 +61,8 @@ selects the Responses surface and Claude aliases the Anthropic one.
 **Capabilities.** Deployments proxied through the OpenOrange upstream carry no
 LiteLLM `supports_*` flags, so thinking and vision come from the Sunport's Pi
 metadata: `pi_reasoning`, `pi_thinking_level_map`, and `pi_compat` (for
-example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5
-need and is applied by default for them). Image input is enabled unless the
+example `forceAdaptiveThinking`, which Claude Sonnet 5 / Opus 4.8+ / Fable 5 /
+Haiku 5.5 need and is applied by default for them). Image input is enabled unless the
 Sunport sets `supports_vision: false`; Pi drops images for text-only models
 before the request is sent.
 

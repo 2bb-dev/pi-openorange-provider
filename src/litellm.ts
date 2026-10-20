@@ -27,14 +27,33 @@ export class OpenOrangeApiError extends Error {
 	}
 }
 
+/**
+ * The Sunport's deployments this key may pick. `GET /v1/model/info` describes
+ * them; `GET /v1/models` is the list model pickers read, and on a free trial it
+ * leaves out the models the trial does not include
+ * (services/openorange-api/src/routes/inferenceModels.ts). Deployments missing
+ * from that list are dropped. Without the list nothing is dropped, as the
+ * Sunport itself marks nothing while it cannot tell.
+ */
 export async function fetchDeployments(
 	sunportUrl: string,
 	apiKey: string,
 	signal?: AbortSignal,
 ): Promise<LitellmDeployment[]> {
-	const body = await request(sunportUrl, "/v1/model/info", apiKey, signal);
-	const data = (body as { data?: unknown }).data;
-	return Array.isArray(data) ? (data as LitellmDeployment[]) : [];
+	const [info, listed] = await Promise.all([
+		request(sunportUrl, "/v1/model/info", apiKey, signal),
+		request(sunportUrl, "/v1/models", apiKey, signal).catch(() => undefined),
+	]);
+	const data = (info as { data?: unknown }).data;
+	const deployments = Array.isArray(data) ? (data as LitellmDeployment[]) : [];
+	const ids = listedModelIds(listed);
+	return ids ? deployments.filter((deployment) => ids.has(deployment.model_name?.trim() ?? "")) : deployments;
+}
+
+function listedModelIds(body: unknown): Set<string> | undefined {
+	const data = isRecord(body) ? body["data"] : undefined;
+	if (!Array.isArray(data)) return undefined;
+	return new Set(data.flatMap((row) => (isRecord(row) && typeof row["id"] === "string" ? [row["id"]] : [])));
 }
 
 export async function fetchKeyIdentity(
@@ -76,16 +95,12 @@ async function request(
 	return (await response.json()) as unknown;
 }
 
-/** LiteLLM `mode` values that are not chat completions. */
-const NON_CHAT_MODES = new Set([
-	"embedding",
-	"image_generation",
-	"audio_transcription",
-	"audio_speech",
-	"moderation",
-	"rerank",
-	"batch",
-]);
+/**
+ * LiteLLM `mode` values of models Pi can chat with; any other mode (embeddings,
+ * speech, images, video) is not one. Same set OpenOrange Code accepts
+ * (isCodeModelMode in services/openorange-api/src/code/modelApi.ts).
+ */
+const CHAT_MODES = new Set(["chat", "completion", "responses"]);
 
 /** OpenOrange renders per-subscription-slot aliases such as `openai/gpt-5.5/2`. */
 const SLOT_ALIAS = /\/\d+$/;
@@ -105,6 +120,7 @@ const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "ma
  */
 const ADAPTIVE_THINKING_CLAUDE = [
 	"claude-fable-5",
+	"claude-haiku-5-5",
 	"claude-opus-4-6",
 	"claude-opus-4-7",
 	"claude-opus-4-8",
@@ -122,8 +138,8 @@ export function toModels(deployments: LitellmDeployment[], sunportUrl: string): 
 		if (!id || seen.has(id) || SLOT_ALIAS.test(id)) continue;
 
 		const info = deployment.model_info ?? {};
-		const mode = stringOrUndefined(info["mode"]);
-		if (mode && NON_CHAT_MODES.has(mode)) continue;
+		const mode = stringOrUndefined(info["mode"])?.toLowerCase();
+		if (mode && !CHAT_MODES.has(mode)) continue;
 
 		seen.add(id);
 		models.push(toModel(id, info, upstreamModel(deployment), sunportUrl));

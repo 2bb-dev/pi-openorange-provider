@@ -33,6 +33,7 @@ const DEPLOYMENTS = [
 	{ model_name: "openai/gpt-5.5/2", model_info: { mode: "responses" } },
 	{ model_name: "gemini/gemini-embedding-001", model_info: { mode: "embedding" } },
 	{ model_name: "groq/whisper-large-v3-turbo", model_info: { mode: "audio_transcription" } },
+	{ model_name: "runwayml/gen4.5", model_info: { mode: "video_generation" } },
 ];
 
 /** Deployments as a Sunport renders them behind its upstream proxy: no
@@ -46,6 +47,12 @@ const PROXIED = [
 	{
 		model_name: "anthropic/claude-opus-5",
 		litellm_params: { model: "litellm_proxy/anthropic/claude-opus-5" },
+		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
+	},
+	{
+		// A model added with the Sunport's own Anthropic key: no pi_compat.
+		model_name: "anthropic/claude-haiku-5-5",
+		litellm_params: { model: "anthropic/claude-haiku-5-5" },
 		model_info: { mode: "chat", pi_api: "anthropic-messages", pi_reasoning: true },
 	},
 	{
@@ -154,6 +161,7 @@ describe("toModels with Pi metadata", () => {
 
 	it("forces adaptive thinking on Claude models that reject budget thinking", () => {
 		expect(byId("anthropic/claude-opus-5")?.compat).toEqual({ forceAdaptiveThinking: true });
+		expect(byId("anthropic/claude-haiku-5-5")?.compat).toEqual({ forceAdaptiveThinking: true });
 	});
 
 	it("lets pi_compat override the adaptive fallback and keeps only scalar entries", () => {
@@ -177,7 +185,7 @@ describe("litellm requests", () => {
 	afterEach(() => vi.unstubAllGlobals());
 
 	function stubFetch(response: Response) {
-		const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response);
+		const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response.clone());
 		vi.stubGlobal("fetch", fetchMock);
 		return fetchMock;
 	}
@@ -189,6 +197,19 @@ describe("litellm requests", () => {
 		expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
 			authorization: "Bearer sk-test",
 		});
+	});
+
+	it("leaves out models the Sunport's model list does not include, as on a free trial", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string | URL) =>
+				new URL(String(url)).pathname === "/v1/models"
+					? Response.json({ object: "list", data: [{ id: "openai/gpt-5.5", object: "model" }] })
+					: Response.json({ data: DEPLOYMENTS }),
+			),
+		);
+		const deployments = await fetchDeployments(SUNPORT, "sk-test");
+		expect(deployments.map((deployment) => deployment.model_name)).toEqual(["openai/gpt-5.5"]);
 	});
 
 	it("reads the key owner from /key/info", async () => {
