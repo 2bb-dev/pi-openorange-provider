@@ -33,6 +33,7 @@ const DEPLOYMENTS = [
 	{ model_name: "openai/gpt-5.5/2", model_info: { mode: "responses" } },
 	{ model_name: "gemini/gemini-embedding-001", model_info: { mode: "embedding" } },
 	{ model_name: "groq/whisper-large-v3-turbo", model_info: { mode: "audio_transcription" } },
+	{ model_name: "runwayml/gen4.5", model_info: { mode: "video_generation" } },
 ];
 
 /** Deployments as a Sunport renders them behind its upstream proxy: no

@@ -76,16 +76,12 @@ async function request(
 	return (await response.json()) as unknown;
 }
 
-/** LiteLLM `mode` values that are not chat completions. */
-const NON_CHAT_MODES = new Set([
-	"embedding",
-	"image_generation",
-	"audio_transcription",
-	"audio_speech",
-	"moderation",
-	"rerank",
-	"batch",
-]);
+/**
+ * LiteLLM `mode` values of models Pi can chat with; any other mode (embeddings,
+ * speech, images, video) is not one. Same set OpenOrange Code accepts
+ * (isCodeModelMode in services/openorange-api/src/code/modelApi.ts).
+ */
+const CHAT_MODES = new Set(["chat", "completion", "responses"]);
 
 /** OpenOrange renders per-subscription-slot aliases such as `openai/gpt-5.5/2`. */
 const SLOT_ALIAS = /\/\d+$/;
@@ -122,8 +118,8 @@ export function toModels(deployments: LitellmDeployment[], sunportUrl: string): 
 		if (!id || seen.has(id) || SLOT_ALIAS.test(id)) continue;
 
 		const info = deployment.model_info ?? {};
-		const mode = stringOrUndefined(info["mode"]);
-		if (mode && NON_CHAT_MODES.has(mode)) continue;
+		const mode = stringOrUndefined(info["mode"])?.toLowerCase();
+		if (mode && !CHAT_MODES.has(mode)) continue;
 
 		seen.add(id);
 		models.push(toModel(id, info, upstreamModel(deployment), sunportUrl));

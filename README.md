@@ -45,8 +45,8 @@ export OPENORANGE_API_KEY=sk-...
 **Model catalog.** The model list is fetched from the Sunport
 (`GET /v1/model/info`) with your key, so you see exactly the models that key is
 allowed to use, with the Sunport's own context windows, pricing, and
-capabilities. Non-chat deployments (embeddings, speech) and per-subscription
-slot aliases (`openai/gpt-5.5/2`) are hidden.
+capabilities. Deployments that are not chat models (embeddings, speech, images,
+video) and per-subscription slot aliases (`openai/gpt-5.5/2`) are hidden.
 
 **Routing.** Each deployment declares its Pi protocol in `model_info.pi_api`
 (the same contract OpenOrange Code uses): `openai-responses` models go to
