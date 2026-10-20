@@ -27,14 +27,33 @@ export class OpenOrangeApiError extends Error {
 	}
 }
 
+/**
+ * The Sunport's deployments this key may pick. `GET /v1/model/info` describes
+ * them; `GET /v1/models` is the list model pickers read, and on a free trial it
+ * leaves out the models the trial does not include
+ * (services/openorange-api/src/routes/inferenceModels.ts). Deployments missing
+ * from that list are dropped. Without the list nothing is dropped, as the
+ * Sunport itself marks nothing while it cannot tell.
+ */
 export async function fetchDeployments(
 	sunportUrl: string,
 	apiKey: string,
 	signal?: AbortSignal,
 ): Promise<LitellmDeployment[]> {
-	const body = await request(sunportUrl, "/v1/model/info", apiKey, signal);
-	const data = (body as { data?: unknown }).data;
-	return Array.isArray(data) ? (data as LitellmDeployment[]) : [];
+	const [info, listed] = await Promise.all([
+		request(sunportUrl, "/v1/model/info", apiKey, signal),
+		request(sunportUrl, "/v1/models", apiKey, signal).catch(() => undefined),
+	]);
+	const data = (info as { data?: unknown }).data;
+	const deployments = Array.isArray(data) ? (data as LitellmDeployment[]) : [];
+	const ids = listedModelIds(listed);
+	return ids ? deployments.filter((deployment) => ids.has(deployment.model_name?.trim() ?? "")) : deployments;
+}
+
+function listedModelIds(body: unknown): Set<string> | undefined {
+	const data = isRecord(body) ? body["data"] : undefined;
+	if (!Array.isArray(data)) return undefined;
+	return new Set(data.flatMap((row) => (isRecord(row) && typeof row["id"] === "string" ? [row["id"]] : [])));
 }
 
 export async function fetchKeyIdentity(

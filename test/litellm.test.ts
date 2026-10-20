@@ -185,7 +185,7 @@ describe("litellm requests", () => {
 	afterEach(() => vi.unstubAllGlobals());
 
 	function stubFetch(response: Response) {
-		const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response);
+		const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response.clone());
 		vi.stubGlobal("fetch", fetchMock);
 		return fetchMock;
 	}
@@ -197,6 +197,19 @@ describe("litellm requests", () => {
 		expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
 			authorization: "Bearer sk-test",
 		});
+	});
+
+	it("leaves out models the Sunport's model list does not include, as on a free trial", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string | URL) =>
+				new URL(String(url)).pathname === "/v1/models"
+					? Response.json({ object: "list", data: [{ id: "openai/gpt-5.5", object: "model" }] })
+					: Response.json({ data: DEPLOYMENTS }),
+			),
+		);
+		const deployments = await fetchDeployments(SUNPORT, "sk-test");
+		expect(deployments.map((deployment) => deployment.model_name)).toEqual(["openai/gpt-5.5"]);
 	});
 
 	it("reads the key owner from /key/info", async () => {
