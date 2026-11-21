@@ -97,8 +97,8 @@ async function request(
 
 /**
  * LiteLLM `mode` values of models Pi can chat with; any other mode (embeddings,
- * speech, images, video) is not one. Same set OpenOrange Code accepts
- * (isCodeModelMode in services/openorange-api/src/code/modelApi.ts).
+ * speech, images, video) is not one. Same set OpenOrange's own Pi model
+ * metadata accepts.
  */
 const CHAT_MODES = new Set(["chat", "completion", "responses"]);
 
@@ -107,7 +107,7 @@ const SLOT_ALIAS = /\/\d+$/;
 
 /**
  * Pi request protocols an OpenOrange deployment may declare in `model_info.pi_api`.
- * Same contract OpenOrange Code reads (services/openorange-api/src/code/modelApi.ts).
+ * Same contract OpenOrange's own Pi model metadata reads.
  */
 const PI_APIS = new Set(["openai-responses", "openai-completions", "anthropic-messages"]);
 
@@ -116,7 +116,7 @@ const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "ma
 /**
  * Claude models that only accept `thinking.type: "adaptive"`; `enabled` is a 400.
  * Fallback for deployments whose `pi_compat` does not say so, aligned with Pi's
- * bundled Anthropic catalog and OpenOrange Code.
+ * bundled Anthropic catalog and OpenOrange's own fallback.
  */
 const ADAPTIVE_THINKING_CLAUDE = [
 	"claude-fable-5",
